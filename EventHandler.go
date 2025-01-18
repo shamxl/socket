@@ -8,49 +8,49 @@ type Args struct {
 }
 
 
-type OnOpenFn func (Args)
-type OnDataFn func (Args)
-type OnCloseFn func (Args)
-type OnErrorFn func (Args)
-type OnConnectionFn func ()
-type OnDisconnectFn func ()
+type onOpenFn        func (Args)
+type onDataFn        func (Args)
+type onCloseFn       func (Args)
+type onErrorFn       func (Args)
+type onConnectionFn  func ()
+type onDisconnectFn  func ()
 
 type EventHandler struct {
-  OnConnection OnConnectionFn
-  OnOpen OnOpenFn
-  OnData OnDataFn
-  OnClose OnCloseFn
-  OnError OnErrorFn
+  OnConnection onConnectionFn
+  OnOpen onOpenFn
+  OnData onDataFn
+  OnClose onCloseFn
+  OnError onErrorFn
 }
 
-func (ev *EventHandler) SetOnConnection (fn OnConnectionFn) {
+func (ev *EventHandler) SetOnConnection (fn onConnectionFn) {
   ev.OnConnection = fn
 }
 
-func (ev *EventHandler) SetOnOpen (fn OnOpenFn) {
+func (ev *EventHandler) SetOnOpen (fn onOpenFn) {
   ev.OnOpen = fn
 }
 
-func (ev *EventHandler) SetOnData (fn OnDataFn) {
+func (ev *EventHandler) SetOnData (fn onDataFn) {
   ev.OnData = fn
 }
 
-func (ev *EventHandler) SetOnClose (fn OnCloseFn) {
+func (ev *EventHandler) SetOnClose (fn onCloseFn) {
   ev.OnClose = fn
 }
 
-func (ev *EventHandler) SetOnError (fn OnErrorFn) {
+func (ev *EventHandler) SetOnError (fn onErrorFn) {
   ev.OnError = fn
 }
 
 
-func (ev *EventHandler) Connection () {
+func (ev *EventHandler) connection () {
   if ev.OnConnection != nil {
     ev.OnConnection()
   }
 }
 
-func (ev *EventHandler) Open (sock *Socket) {
+func (ev *EventHandler) open (sock *Socket) {
   if ev.OnOpen != nil {
     ev.OnOpen(Args{
       Socket: sock,
@@ -58,7 +58,7 @@ func (ev *EventHandler) Open (sock *Socket) {
   }
 }
 
-func (ev *EventHandler) Data (sock *Socket, data []byte) {
+func (ev *EventHandler) data (sock *Socket, data []byte) {
   if ev.OnData != nil {
     ev.OnData(Args{
       Socket: sock,
@@ -67,7 +67,7 @@ func (ev *EventHandler) Data (sock *Socket, data []byte) {
   }
 }
 
-func (ev *EventHandler) Close (sock *Socket, reason string) {
+func (ev *EventHandler) close (sock *Socket, reason string) {
   if ev.OnClose != nil {
     ev.OnClose(Args{
       Socket: sock,
@@ -76,7 +76,7 @@ func (ev *EventHandler) Close (sock *Socket, reason string) {
   }
 }
 
-func (ev *EventHandler) Error (err error) {
+func (ev *EventHandler) err (err error) {
   if ev.OnError != nil {
     ev.OnError(Args{
       ErrorMsg: err,
