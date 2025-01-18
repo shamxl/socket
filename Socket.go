@@ -43,25 +43,31 @@ func WithPort (port int) Option {
   }
 }
 
+func WithEventHandler (ev EventHandler) Option {
+  return func (s *Socket) {
+    s.EventHandler = ev
+  }
+}
+
 
 func (s *Socket) Listen () {
   addr := s.host + ":" + strconv.Itoa(s.port)
   listener, err := net.Listen("tcp", addr)
 
   if err != nil {
-    s.EventHandler.Error(err)
+    s.EventHandler.err(err)
   }
 
   s.Listener = listener
-  s.EventHandler.Open(s)
+  s.EventHandler.open(s)
 
   for {
     conn, err := listener.Accept()
     defer conn.Close()
     if err != nil {
-      s.EventHandler.Error(err)
+      s.EventHandler.err(err)
     }
-    s.EventHandler.Connection()
+    s.EventHandler.connection()
 
     go s.handleConn(conn)
   }
@@ -72,12 +78,12 @@ func (s *Socket) handleConn (conn net.Conn) {
 
   for {
     _, err := io.Copy(&buffer, conn) 
-    s.EventHandler.Data(s, buffer.Bytes())
+    s.EventHandler.data(s, buffer.Bytes())
     if err != nil {
       if err.Error() != "EOF" {
-        s.EventHandler.Error(err)
+        s.EventHandler.err(err)
       }
-      s.EventHandler.Close(s, "Client Disconnected")
+      s.EventHandler.close(s, "Client Disconnected")
       break
     }
 
