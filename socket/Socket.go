@@ -12,12 +12,15 @@ type Socket struct {
   mu sync.Mutex
   host string
   port int
-  Listener net.Listener
+  listener net.Listener
   Conn net.Conn
   Connections int
   EventHandler EventHandler
   isServer bool
   bufferSize int
+  Wg *sync.WaitGroup
+  quit chan interface{}
+  addr string
 }
 
 func NewTCPServer (opts ...Option) *Socket {
@@ -26,6 +29,7 @@ func NewTCPServer (opts ...Option) *Socket {
     port: 7687,
     isServer: true,
     bufferSize: 1024,
+    Wg: &sync.WaitGroup{},
   }
   for _, fn := range opts {
     fn(s)
@@ -33,56 +37,77 @@ func NewTCPServer (opts ...Option) *Socket {
   return s
 }
 
+// set the host to use
 func WithHost (host string) Option {
   return func(s *Socket) {
     s.host = host
   }
 }
 
+// set the port to listen/dail
 func WithPort (port int) Option {
   return func(s *Socket) {
     s.port = port
   }
 }
 
+// set event handler
 func WithEventHandler (ev EventHandler) Option {
   return func (s *Socket) {
     s.EventHandler = ev
   }
 }
 
+// set initial buffer size
 func WithBufferSize (size int) Option {
   return func (s *Socket) {
     s.bufferSize = size
   }
 }
 
+// set wait group 
+func SetWaitGroup (wg *sync.WaitGroup) Option {
+  return func (s *Socket) {
+    s.Wg = wg
+  }
+}
+
 
 func (s *Socket) Listen () {
   addr := s.host + ":" + strconv.Itoa(s.port)
+  s.addr = addr
+  s.quit = make(chan interface{})
   listener, err := net.Listen("tcp", addr)
 
   if err != nil {
     s.EventHandler.err(err)
   }
 
-  s.Listener = listener
+  s.listener = listener
   s.EventHandler.open(s)
 
   for {
     conn, err := listener.Accept()
     if err != nil {
-      s.EventHandler.err(err)
+      // check if the error occurred because the listener was closed
+      // and terminates the loop
+      select {
+      case <- s.quit:
+        return
+      default:
+        s.EventHandler.err(err)
+      }
+    } else {
+      s.EventHandler.connection()
+      s.Wg.Add(1)
+      go s.handleConn(conn)
     }
-    s.EventHandler.connection()
-
-    go s.handleConn(conn)
   }
 }
 
 // Handles the incoming connection
 func (s *Socket) handleConn (conn net.Conn) {
-  defer conn.Close()
+  defer s.Wg.Done()
   // initalizing buffer with the initial buffer size set by the user/default
   s.mu.Lock()
   var buffer = make ([]byte, s.bufferSize)
@@ -125,4 +150,15 @@ func (s *Socket) SwitchBufferSize (size int) {
   s.mu.Unlock()
 }
 
+// stops the listener from accepting new connections and 
+// waits for the goroutines to end
+func (s *Socket) Close () {
+  close(s.quit)
+  s.listener.Close()
+  s.Wg.Wait()
+}
 
+// returns the address of the listener
+func (s *Socket) Address () string {
+  return s.addr
+}
