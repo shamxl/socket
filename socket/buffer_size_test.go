@@ -21,6 +21,7 @@ func TestMain (t *testing.T) {
     if bufferSizeSwitched {
       if len(args.Data) == bufferSizeToSwitch {
         t.Log("Test Passed") 
+        args.Socket.Close()
       } else {
         t.Fail()
       }
@@ -31,8 +32,6 @@ func TestMain (t *testing.T) {
       t.Log("Send some data")
     }
   })
-
   sock := socket.NewTCPServer(socket.WithEventHandler(ev), socket.WithBufferSize(3))
   sock.Listen()
-
 }
