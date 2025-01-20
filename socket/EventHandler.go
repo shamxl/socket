@@ -12,7 +12,7 @@ type onOpenFn        func (Args)
 type onDataFn        func (Args)
 type onCloseFn       func (Args)
 type onErrorFn       func (Args)
-type onConnectionFn  func ()
+type onConnectionFn  func (Args)
 type onDisconnectFn  func ()
 
 type EventHandler struct {
@@ -44,9 +44,11 @@ func (ev *EventHandler) SetOnError (fn onErrorFn) {
 }
 
 
-func (ev *EventHandler) connection () {
+func (ev *EventHandler) connection (sock *Socket) {
   if ev.OnConnection != nil {
-    ev.OnConnection()
+    ev.OnConnection(Args{
+      Socket: sock,
+    })
   }
 }
 
