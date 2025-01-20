@@ -4,6 +4,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type Option func (*Socket)
@@ -16,18 +17,17 @@ type Socket struct {
   Conn net.Conn
   Connections int
   EventHandler EventHandler
-  isServer bool
+  IsServer bool
   bufferSize int
   Wg *sync.WaitGroup
   quit chan interface{}
   addr string
 }
 
-func NewTCPServer (opts ...Option) *Socket {
+func NewTCPSocket (opts ...Option) *Socket {
   s := &Socket{
     host: "localhost",
     port: 7687,
-    isServer: true,
     bufferSize: 1024,
     Wg: &sync.WaitGroup{},
   }
@@ -74,6 +74,7 @@ func SetWaitGroup (wg *sync.WaitGroup) Option {
 
 
 func (s *Socket) Listen () {
+  s.IsServer = true
   addr := s.host + ":" + strconv.Itoa(s.port)
   s.addr = addr
   s.quit = make(chan interface{})
@@ -98,7 +99,8 @@ func (s *Socket) Listen () {
         s.EventHandler.err(err)
       }
     } else {
-      s.EventHandler.connection()
+      s.Conn = conn
+      s.EventHandler.connection(s)
       s.Wg.Add(1)
       go s.handleConn(conn)
     }
@@ -128,7 +130,7 @@ func (s *Socket) handleConn (conn net.Conn) {
       if err.Error() != "EOF" {
         s.EventHandler.err(err)
       }
-      s.EventHandler.close(s, "Client Disconnected")
+      s.EventHandler.close(s, "Connection Dropped")
       break
     }
     
@@ -154,11 +156,50 @@ func (s *Socket) SwitchBufferSize (size int) {
 // waits for the goroutines to end
 func (s *Socket) Close () {
   close(s.quit)
-  s.listener.Close()
+  if s.IsServer {
+    s.listener.Close()
+  } else {
+    s.Conn.Close()
+  }
   s.Wg.Wait()
 }
 
 // returns the address of the listener
 func (s *Socket) Address () string {
   return s.addr
+}
+
+// Connects to a TCP server.
+func (s *Socket) Dial () {
+  s.IsServer = false
+  addr := s.host + ":" + strconv.Itoa(s.port)
+  conn, err := net.Dial("tcp", addr)
+  if err != nil {
+    s.EventHandler.err(err)
+  }
+  s.Conn = conn
+  s.EventHandler.open(s)
+
+  s.quit = make(chan interface{})
+  s.Wg.Add(1)
+  go s.handleConn(conn)
+
+  // waits for the quit signal
+  for {
+    select {
+    case <- s.quit:
+      return // exit
+
+    default:
+      time.Sleep (100 * time.Millisecond)
+    }
+  }
+}
+
+
+func (s *Socket) Write (data []byte) {
+  _, err := s.Conn.Write(data)
+  if err != nil {
+    s.EventHandler.err(err)
+  }
 }
